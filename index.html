@@ -2,91 +2,19 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
   <title>ことばブロック くずし</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css">
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #FFF6E5; color: #5A4632; font-family: 'Hiragino Maru Gothic ProN', 'Yu Gothic', sans-serif; text-align: center; }
+    h1 { font-size: 28px; margin: 0 0 12px; color: #6C63FF; }
+    p { font-size: 20px; line-height: 1.8; margin: 0; }
+  </style>
 </head>
 <body>
-<main id="app">
-
-  <!-- スタート：学年の入り口 -->
-  <section id="screen-start" class="screen">
-    <h1 class="logo">ことばブロック<br>くずし</h1>
-    <p class="lead">ことばの きまりを おぼえながら<br>ブロックを くずそう！</p>
-    <button id="btn-grade-1" class="big-btn g1" type="button">
-      <span class="big-title">1ねんせい</span><span class="big-sub" id="sub-grade-1"></span>
-    </button>
-    <button id="btn-grade-2" class="big-btn g2" type="button">
-      <span class="big-title">2ねんせい</span><span class="big-sub" id="sub-grade-2"></span>
-    </button>
-  </section>
-
-  <!-- ステージえらび -->
-  <section id="screen-map" class="screen" hidden>
-    <header class="bar">
-      <button id="map-back" class="icon-btn" type="button">もどる</button>
-      <div id="map-title" class="bar-title"></div>
-      <div id="map-coins" class="bar-note"></div>
-    </header>
-    <div id="map-list" class="map-list"></div>
-    <button id="open-all" class="teacher-btn" type="button"></button>
-  </section>
-
-  <!-- あそぶ画面（縦長） -->
-  <section id="screen-play" class="screen" hidden>
-    <header class="bar">
-      <button id="play-back" class="icon-btn" type="button">もどる</button>
-      <div id="play-title" class="bar-title"></div>
-      <div id="progress" class="bar-note"></div>
-      <button id="mute" class="icon-btn" type="button">おと：あり</button>
-    </header>
-
-    <div class="stage-wrap">
-      <canvas id="c" width="540" height="720"></canvas>
-      <div id="overlay" class="overlay" hidden>
-        <div class="result">
-          <div class="result-title">クリア！</div>
-          <div id="result-stars" class="result-stars"></div>
-          <div id="result-score" class="result-line"></div>
-          <div id="result-points" class="result-line"></div>
-          <div class="result-sub">ずかん</div>
-          <div id="zukan" class="zukan"></div>
-          <div class="result-buttons">
-            <button id="again" class="action-btn" type="button">もういちど</button>
-            <button id="next" class="action-btn primary" type="button">つぎへ</button>
-            <button id="to-map" class="action-btn" type="button">ステージえらび</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div id="card" class="card">
-      <div class="card-head">
-        <div id="card-prompt" class="card-prompt"></div>
-        <button id="speak" class="icon-btn" type="button">よみあげ</button>
-      </div>
-      <div id="card-stem" class="card-stem"></div>
-      <div id="card-choices" class="card-choices"></div>
-      <div id="card-actions" class="card-actions"></div>
-      <div id="card-feedback" class="feedback"></div>
-    </div>
-  </section>
-
-</main>
-
-<script src="js/config.js"></script>
-<script src="js/question-types.js"></script>
-<script src="js/pictures.js"></script>
-<script src="js/questions-grade1.js"></script>
-<script src="js/questions-grade2.js"></script>
-<script src="js/stages.js"></script>
-<script src="js/audio.js"></script>
-<script src="js/storage.js"></script>
-<script src="js/engine.js"></script>
-<script src="js/render.js"></script>
-<script src="js/question-ui.js"></script>
-<script src="js/main.js"></script>
+  <main>
+    <h1>ことばブロック くずし</h1>
+    <p>いまは おやすみちゅう だよ。<br>また あとで あそぼうね。</p>
+  </main>
 </body>
 </html>
