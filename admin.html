@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>ことばクエスト 管理画面</title>
+  <style>
+    :root { --ink: #3d3326; --line: #e2d4bc; --bg: #fffaf0; --accent: #5b52f0; --ok: #2e9d5b; --ng: #d63c3c; --warn: #f5c24d; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: 'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif; font-size: 15px; line-height: 1.6; }
+    main { max-width: 980px; margin: 0 auto; padding: 12px; }
+    h1 { font-size: 20px; margin: 4px 0 10px; }
+    h2 { font-size: 16px; margin: 18px 0 6px; }
+    button, select, input { font: inherit; color: inherit; }
+    button { border: 2px solid var(--line); background: #fff; border-radius: 8px; padding: 6px 12px; cursor: pointer; font-weight: 700; }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button.danger { background: var(--ng); border-color: var(--ng); color: #fff; }
+    button:disabled { opacity: .5; cursor: default; }
+    select, input[type=text], input[type=password] { border: 2px solid var(--line); border-radius: 8px; padding: 6px 8px; background: #fff; }
+    .bar { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
+    .tabs button.sel { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0; }
+    .card { background: #fff; border: 2px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 8px 0; }
+    .msg { margin: 8px 0; padding: 8px 10px; border-radius: 8px; background: #fff1c9; border: 2px solid var(--warn); font-weight: 700; }
+    .msg.ok { background: #e3f7ea; border-color: var(--ok); }
+    .msg[hidden] { display: none; }
+    .scroll { overflow-x: auto; }
+    table { border-collapse: collapse; background: #fff; }
+    th, td { border: 1px solid var(--line); padding: 4px 8px; text-align: center; white-space: nowrap; font-size: 13px; }
+    th { background: #f6ecd8; }
+    td.left { text-align: left; white-space: normal; min-width: 220px; }
+    .stopped { color: var(--ng); font-weight: 700; }
+    .running { color: var(--ok); font-weight: 700; }
+    .frozen { color: var(--ng); font-weight: 700; }
+    .hint { font-size: 13px; opacity: .8; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>ことばクエスト 管理画面</h1>
+  <div id="notice" class="msg" hidden></div>
+
+  <section id="view-login" class="card">
+    <div class="row"><label>ID <input id="admin-id" type="text" autocomplete="username" value="admin"></label></div>
+    <div class="row"><label>パスワード <input id="admin-pass" type="password" autocomplete="current-password"></label></div>
+    <button id="login-btn" class="primary" type="button">ログイン</button>
+  </section>
+
+  <section id="view-main" hidden>
+    <div class="bar"><span class="hint">パスワードの照合はサーバー側だけで行います。</span><button id="logout-btn" type="button">ログアウト</button></div>
+    <nav id="tabs" class="tabs"></nav>
+    <div id="panel"></div>
+  </section>
+</main>
+
+<script src="js/config.js"></script>
+<script src="js/question-types.js"></script>
+<script src="js/questions-grade1.js"></script>
+<script src="js/questions-grade2.js"></script>
+<script src="js/stages.js"></script>
+<script>
+(function () {
+  var KB = window.KB, C = KB.CONFIG;
+  var TOKEN_KEY = 'kotoba-admin-token';
+  var CONFIRM_MS = 4000;
+  var TABS = [
+    { id: 'switch', label: '停止・再開' },
+    { id: 'overview', label: '成績一覧' },
+    { id: 'wrong', label: 'まちがいの順位' },
+    { id: 'student', label: '児童の管理' },
+    { id: 'log', label: 'ログ' }
+  ];
+  var state = { token: '', classCounts: { 1: 5, 2: 5 }, switches: [], tab: 'switch' };
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- 小さな部品 ----------
+  function el(tag, props, children) {
+    var node = document.createElement(tag);
+    Object.keys(props || {}).forEach(function (key) {
+      if (key === 'text') node.textContent = props[key];
+      else if (key === 'className') node.className = props[key];
+      else if (key.indexOf('on') === 0) node.addEventListener(key.slice(2), props[key]);
+      else node.setAttribute(key, props[key]);
+    });
+    (children || []).forEach(function (child) { node.appendChild(typeof child === 'string' ? document.createTextNode(child) : child); });
+    return node;
+  }
+  function select(options, value, onChange) {
+    var sel = el('select', {});
+    options.forEach(function (o) {
+      var opt = el('option', { value: String(o.value), text: o.label });
+      if (String(o.value) === String(value)) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    if (onChange) sel.addEventListener('change', function () { onChange(sel.value); });
+    return sel;
+  }
+  function range(from, to) { var list = []; for (var i = from; i <= to; i++) list.push(i); return list; }
+  function gradeOptions() { return C.GRADE_LIST.map(function (g) { return { value: g, label: g + '年' }; }); }
+  function classOptions(grade, withAll) {
+    var list = range(1, state.classCounts[grade] || C.DEFAULT_CLASS_COUNT).map(function (n) { return { value: n, label: n + '組' }; });
+    return withAll ? [{ value: 0, label: '学年ぜんたい' }].concat(list) : list;
+  }
+  function showNotice(text, ok) {
+    var box = $('notice');
+    box.textContent = text || '';
+    box.className = 'msg' + (ok ? ' ok' : '');
+    box.hidden = !text;
+  }
+  // 危険な操作は、4秒以内にもう一度押した時だけ実行する
+  function confirmButton(label, doneLabel, action, extraClass) {
+    var timer = 0;
+    var btn = el('button', { className: extraClass || '', text: label });
+    btn.addEventListener('click', function () {
+      if (timer) { clearTimeout(timer); timer = 0; btn.textContent = label; action(); return; }
+      btn.textContent = doneLabel;
+      timer = setTimeout(function () { timer = 0; btn.textContent = label; }, CONFIRM_MS);
+    });
+    return btn;
+  }
+
+  // ---------- 通信 ----------
+  function call(action, payload) {
+    if (!C.API_URL) return Promise.resolve({ ok: false, reason: 'nourl', message: 'js/config.js の API_URL が空です。' });
+    var body = JSON.stringify(Object.assign({ action: action, token: state.token }, payload || {}));
+    return fetch(C.API_URL, { method: 'POST', body: body })
+      .then(function (res) { return res.json(); })
+      .catch(function () { return { ok: false, reason: 'network', message: 'サーバーにつながりませんでした。' }; })
+      .then(function (res) {
+        if (!res.ok && res.reason === 'auth' && state.token) { logout('ログインが切れました。もう一度ログインしてください。'); }
+        return res;
+      });
+  }
+  function failText(res) { return res.message || 'うまくいきませんでした。'; }
+
+  // ---------- ログイン ----------
+  function setToken(token) {
+    state.token = token || '';
+    try { if (token) sessionStorage.setItem(TOKEN_KEY, token); else sessionStorage.removeItem(TOKEN_KEY); } catch (e) { /* 保存できなくても使える */ }
+  }
+  function login() {
+    showNotice('ログインしています…');
+    call('adminLogin', { id: $('admin-id').value, password: $('admin-pass').value }).then(function (res) {
+      if (!res.ok) { showNotice(failText(res)); return; }
+      setToken(res.token);
+      $('admin-pass').value = '';
+      showNotice('');
+      enterMain();
+    });
+  }
+  function logout(message) {
+    setToken('');
+    $('view-main').hidden = true;
+    $('view-login').hidden = false;
+    showNotice(message || '');
+  }
+  function enterMain() {
+    call('adminStatus').then(function (res) {
+      if (!res.ok) return;
+      state.classCounts = res.classCounts;
+      state.switches = res.switches;
+      $('view-login').hidden = true;
+      $('view-main').hidden = false;
+      renderTabs();
+      showTab(state.tab);
+    });
+  }
+
+  // ---------- タブ ----------
+  function renderTabs() {
+    var nav = $('tabs');
+    nav.textContent = '';
+    TABS.forEach(function (t) {
+      nav.appendChild(el('button', { className: t.id === state.tab ? 'sel' : '', text: t.label, onclick: function () { showTab(t.id); renderTabs(); } }));
+    });
+  }
+  function showTab(id) {
+    state.tab = id;
+    var panel = $('panel');
+    panel.textContent = '';
+    showNotice('');
+    ({ switch: renderSwitchTab, overview: renderOverviewTab, wrong: renderWrongTab, student: renderStudentTab, log: renderLogTab })[id](panel);
+  }
+
+  // ---------- 停止・再開 ----------
+  function scopeList() {
+    var list = [{ scope: 'ALL', label: '全体（すべての学年・組）' }];
+    C.GRADE_LIST.forEach(function (g) {
+      list.push({ scope: 'G' + g, label: g + '年ぜんたい' });
+      range(1, state.classCounts[g]).forEach(function (n) { list.push({ scope: 'G' + g + '-' + n, label: g + '年' + n + '組' }); });
+    });
+    return list;
+  }
+  function renderSwitchTab(panel) {
+    var messageInput = el('input', { type: 'text', size: '36', maxlength: '80', placeholder: '停止中に児童へ出すメッセージ（空ならいつもの文）' });
+    panel.appendChild(el('div', { className: 'card' }, [el('label', {}, ['停止するときのメッセージ ', messageInput])]));
+    var table = el('table');
+    table.appendChild(el('tr', {}, ['範囲', '状態', '操作'].map(function (t) { return el('th', { text: t }); })));
+    scopeList().forEach(function (item) {
+      var found = state.switches.filter(function (s) { return s.scope === item.scope; })[0];
+      var running = !found || found.enabled;
+      var btn = el('button', { className: running ? 'danger' : 'primary', text: running ? '停止する' : '再開する', onclick: function () {
+        call('setSwitch', { scope: item.scope, enabled: !running, message: messageInput.value }).then(function (res) {
+          if (!res.ok) { showNotice(failText(res)); return; }
+          state.switches = res.switches;
+          showTab('switch');
+          showNotice(item.label + ' を' + (running ? '停止' : '再開') + 'しました。', true);
+        });
+      } });
+      var status = el('td', { className: running ? 'running' : 'stopped', text: running ? '公開中' : '停止中' + (found && found.message ? '：' + found.message : '') });
+      table.appendChild(el('tr', {}, [el('td', { text: item.label }), status, el('td', {}, [btn])]));
+    });
+    panel.appendChild(el('div', { className: 'scroll' }, [table]));
+
+    panel.appendChild(el('h2', { text: '組の数' }));
+    C.GRADE_LIST.forEach(function (g) {
+      var sel = select(range(1, 10).map(function (n) { return { value: n, label: n + '組' }; }), state.classCounts[g]);
+      panel.appendChild(el('div', { className: 'row' }, [g + '年 ', sel, el('button', { text: '保存', onclick: function () {
+        call('setClassCount', { grade: g, count: Number(sel.value) }).then(function (res) {
+          if (!res.ok) { showNotice(failText(res)); return; }
+          state.classCounts = res.classCounts;
+          showTab('switch');
+          showNotice(g + '年を' + sel.value + '組にしました。', true);
+        });
+      } })]));
+    });
+    panel.appendChild(el('p', { className: 'hint', text: '停止中でも、すでに遊んでいる児童は今の問題まで続けられます。次にステージを始める時と、記録を送る時に止まります。' }));
+  }
+
+  // ---------- 成績一覧 ----------
+  function starText(info) {
+    if (!info || !info.cleared) return '-';
+    var out = '';
+    for (var i = 0; i < 3; i++) out += i < info.bestStars ? '★' : '☆';
+    return out;
+  }
+  function renderOverviewTab(panel) {
+    var grade = C.GRADE_LIST[0], classId = 1;
+    var result = el('div', { className: 'scroll' });
+    var gradeSel = select(gradeOptions(), grade, function (v) { grade = Number(v); fillClass(); });
+    var classBox = el('span');
+    function fillClass() {
+      classBox.textContent = '';
+      var sel = select(classOptions(grade, false), classId, function (v) { classId = Number(v); });
+      classBox.appendChild(sel);
+      classId = Number(sel.value);
+    }
+    fillClass();
+    panel.appendChild(el('div', { className: 'row' }, [gradeSel, classBox, el('button', { className: 'primary', text: '表示', onclick: function () { loadOverview(); } })]));
+    panel.appendChild(result);
+
+    function loadOverview() {
+      call('overview', { grade: grade, classId: classId }).then(function (res) {
+        result.textContent = '';
+        if (!res.ok) { showNotice(failText(res)); return; }
+        var stages = KB.STAGES[grade];
+        var head = [el('th', { text: '番号' })].concat(stages.map(function (s) { return el('th', { text: String(s.ordinal + 1), title: s.title }); }));
+        head.push(el('th', { text: 'ほし' }), el('th', { text: '最終' }), el('th', { text: '状態' }));
+        var table = el('table');
+        table.appendChild(el('tr', {}, head));
+        res.students.forEach(function (st) {
+          var cells = [el('td', { text: String(st.number) })].concat(stages.map(function (s) { return el('td', { text: starText(st.stages[s.id]) }); }));
+          cells.push(el('td', { text: String(st.coins) }), el('td', { text: st.updatedAt }), el('td', { className: st.frozen ? 'frozen' : '', text: st.frozen ? '凍結' : '' }));
+          table.appendChild(el('tr', {}, cells));
+        });
+        result.appendChild(res.students.length ? table : el('p', { text: 'まだ記録がありません。' }));
+        result.appendChild(el('p', { className: 'hint', text: '列の番号にカーソルを合わせると、ステージ名が出ます。' }));
+      });
+    }
+  }
+
+  // ---------- まちがいの順位 ----------
+  function questionInfo(id, grade) {
+    var q = KB.getQuestion(id);
+    var poolTitle = (KB.POOLS[id.split(':')[0]] || {}).title || '';
+    if (!q) return { text: id, answer: '', pool: poolTitle };
+    var answer = q.type === 'point' ? q.words[q.target] : q.type === 'collect' ? q.answers.join('・') : q.type === 'order' ? q.pieces.join(' ') : q.answer;
+    var body = q.type === 'point' ? q.words.join(' ') + '（' + (q.ask === 'subject' ? '主語' : '述語') + 'はどれ）' : (q.stem ? q.prompt + ' ' + q.stem : q.prompt);
+    return { text: body, answer: answer, pool: poolTitle };
+  }
+  function renderWrongTab(panel) {
+    var grade = C.GRADE_LIST[0], classId = 0;
+    var result = el('div', { className: 'scroll' });
+    var classBox = el('span');
+    function fillClass() {
+      classBox.textContent = '';
+      var sel = select(classOptions(grade, true), 0, function (v) { classId = Number(v); });
+      classBox.appendChild(sel);
+      classId = 0;
+    }
+    fillClass();
+    var gradeSel = select(gradeOptions(), grade, function (v) { grade = Number(v); fillClass(); });
+    panel.appendChild(el('div', { className: 'row' }, [gradeSel, classBox, el('button', { className: 'primary', text: '表示', onclick: function () {
+      call('ranking', { grade: grade, classId: classId }).then(function (res) {
+        result.textContent = '';
+        if (!res.ok) { showNotice(failText(res)); return; }
+        result.appendChild(el('p', { className: 'hint', text: 'ステージを終えた回数：' + res.attempts + '回。「1回めでまちがえた」問題を数えています。' }));
+        var table = el('table');
+        table.appendChild(el('tr', {}, ['順位', '問題', 'せいかい', 'まとまり', '回数', '人数'].map(function (t) { return el('th', { text: t }); })));
+        res.ranking.forEach(function (r, i) {
+          var info = questionInfo(r.id, grade);
+          table.appendChild(el('tr', {}, [el('td', { text: String(i + 1) }), el('td', { className: 'left', text: info.text }), el('td', { text: info.answer }),
+            el('td', { text: info.pool }), el('td', { text: String(r.count) }), el('td', { text: String(r.students) })]));
+        });
+        result.appendChild(res.ranking.length ? table : el('p', { text: 'まちがいの記録はまだありません。' }));
+      });
+    } })]));
+    panel.appendChild(result);
+  }
+
+  // ---------- 児童の管理（凍結・削除・復元） ----------
+  function renderStudentTab(panel) {
+    var pick = { grade: C.GRADE_LIST[0], classId: 1, number: 1 };
+    var classBox = el('span');
+    function fillClass() {
+      classBox.textContent = '';
+      var sel = select(classOptions(pick.grade, false), pick.classId, function (v) { pick.classId = Number(v); });
+      classBox.appendChild(sel);
+      pick.classId = Number(sel.value);
+    }
+    fillClass();
+    var gradeSel = select(gradeOptions(), pick.grade, function (v) { pick.grade = Number(v); fillClass(); });
+    var numberSel = select(range(1, C.MAX_NUMBER).map(function (n) { return { value: n, label: n + '番' }; }), 1, function (v) { pick.number = Number(v); });
+    panel.appendChild(el('div', { className: 'card' }, [
+      el('div', { className: 'row' }, [gradeSel, classBox, numberSel]),
+      el('div', { className: 'row' }, [
+        el('button', { text: '凍結する', onclick: function () { setFrozen(true); } }),
+        el('button', { text: '凍結を解除', onclick: function () { setFrozen(false); } }),
+        confirmButton('データを削除', 'もう一度押すと削除します', deleteStudent, 'danger')
+      ]),
+      el('p', { className: 'hint', text: '削除しても、控えが ' + 30 + ' 日間のこります。下の一覧から復元できます。' })
+    ]));
+    var backups = el('div', { className: 'scroll' });
+    panel.appendChild(el('h2', { text: '控え（復元用）' }));
+    panel.appendChild(backups);
+    loadBackups();
+
+    function setFrozen(flag) {
+      call('setFrozen', Object.assign({ frozen: flag }, pick)).then(function (res) {
+        showNotice(res.ok ? (flag ? '凍結しました。' : '凍結を解除しました。') : failText(res), res.ok);
+      });
+    }
+    function deleteStudent() {
+      call('deleteStudent', pick).then(function (res) {
+        showNotice(res.ok ? '削除しました（控えから復元できます）。' : failText(res), res.ok);
+        if (res.ok) loadBackups();
+      });
+    }
+    function loadBackups() {
+      call('listBackups').then(function (res) {
+        backups.textContent = '';
+        if (!res.ok) { showNotice(failText(res)); return; }
+        var table = el('table');
+        table.appendChild(el('tr', {}, ['日時', '児童（学年-組-番号）', '理由', ''].map(function (t) { return el('th', { text: t }); })));
+        var reasons = { save: 'セーブ前', 'delete': '削除前', restore: '復元前' };
+        res.backups.forEach(function (b) {
+          var restore = confirmButton('復元', 'もう一度押すと復元', function () {
+            call('restoreBackup', { at: b.at, key: b.key, reason: b.reason }).then(function (r) {
+              showNotice(r.ok ? b.key + ' を復元しました。' : failText(r), r.ok);
+              if (r.ok) loadBackups();
+            });
+          });
+          table.appendChild(el('tr', {}, [el('td', { text: b.at }), el('td', { text: b.key }), el('td', { text: reasons[b.reason] || b.reason }), el('td', {}, [restore])]));
+        });
+        backups.appendChild(res.backups.length ? table : el('p', { text: '控えはまだありません。' }));
+      });
+    }
+  }
+
+  // ---------- ログ ----------
+  function renderLogTab(panel) {
+    var type = 'teacher';
+    var result = el('div', { className: 'scroll' });
+    var sel = select([{ value: 'teacher', label: '先生の操作' }, { value: 'student', label: '児童のログイン・記録' }], type, function (v) { type = v; load(); });
+    panel.appendChild(el('div', { className: 'row' }, [sel, el('button', { text: '更新', onclick: function () { load(); } })]));
+    panel.appendChild(result);
+    function load() {
+      call('readLog', { type: type }).then(function (res) {
+        result.textContent = '';
+        if (!res.ok) { showNotice(failText(res)); return; }
+        var table = el('table');
+        table.appendChild(el('tr', {}, ['日時', '操作', '内容'].map(function (t) { return el('th', { text: t }); })));
+        res.logs.forEach(function (l) { table.appendChild(el('tr', {}, [el('td', { text: l.at }), el('td', { text: l.action }), el('td', { className: 'left', text: l.detail })])); });
+        result.appendChild(res.logs.length ? table : el('p', { text: 'ログはまだありません。' }));
+      });
+    }
+    load();
+  }
+
+  // ---------- 起動 ----------
+  $('login-btn').addEventListener('click', login);
+  $('admin-pass').addEventListener('keydown', function (e) { if (e.key === 'Enter') login(); });
+  $('logout-btn').addEventListener('click', function () { logout(''); });
+  if (!C.API_URL) showNotice('js/config.js の API_URL が空です。ガスのURLを入れてから開いてください。');
+  var saved = '';
+  try { saved = sessionStorage.getItem(TOKEN_KEY) || ''; } catch (e) { saved = ''; }
+  if (saved && C.API_URL) { state.token = saved; enterMain(); }
+})();
+</script>
+</body>
+</html>

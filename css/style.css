@@ -106,3 +106,15 @@ button:disabled { cursor: default; }
   body { background: #FFEFD6; }
   #app { background: var(--bg); box-shadow: 0 0 0 2px var(--line); }
 }
+
+/* ---- ログイン・お知らせ ---- */
+.logo.small { font-size: 28px; margin-top: 20px; }
+.login-message { min-height: 1.6em; text-align: center; color: var(--ng); font-weight: 700; margin: 0 0 8px; }
+.login-group { margin: 10px 0; }
+.login-label { font-weight: 700; font-size: 14px; margin-bottom: 4px; display: block; }
+.login-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.pick-btn { flex: 1 1 auto; min-width: 72px; min-height: 48px; border: 2px solid var(--line); background: var(--card); border-radius: 12px; font-size: 18px; font-weight: 700; padding: 6px 12px; }
+.pick-btn.sel { border-color: var(--accent); background: #ECEAFF; color: var(--accent); }
+.login-input { width: 100%; min-height: 52px; border: 2px solid var(--line); border-radius: 12px; font-size: 24px; font-weight: 700; padding: 6px 12px; text-align: center; background: var(--card); color: var(--ink); }
+.notice { margin: 6px 0; padding: 8px 10px; border-radius: 10px; background: #FFF1C9; border: 2px solid #F5C24D; font-size: 13px; line-height: 1.6; font-weight: 700; }
+.notice[hidden] { display: none; }

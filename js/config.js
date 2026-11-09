@@ -30,6 +30,14 @@
     STAR3_RATIO: 0.9, STAR2_RATIO: 0.7,
     // 保存
     STORAGE_KEY: 'kotoba-break-v1',
+    // ガス（サーバー）との連携。URLを入れると、学年・組・出席番号のログインと記録の送信が有効になる。
+    // 空のままなら、ログインなしで この端末だけに保存して あそべる。
+    API_URL: '',
+    API_TIMEOUT_MS: 8000,
+    PENDING_KEY: 'kotoba-break-pending',
+    DEFAULT_CLASS_COUNT: 5,
+    MAX_NUMBER: 40,
+    GRADE_LIST: [1, 2],
     FONT: "'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', 'Yu Gothic', sans-serif"
   };
 

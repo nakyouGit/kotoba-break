@@ -11,6 +11,17 @@
 <body>
 <main id="app">
 
+  <!-- ログイン：学年・組・出席番号（ガス連携ありの時だけ使う） -->
+  <section id="screen-login" class="screen" hidden>
+    <h1 class="logo small">ことばブロック<br>くずし</h1>
+    <p id="login-message" class="login-message"></p>
+    <div class="login-group"><div class="login-label">がくねん</div><div id="login-grades" class="login-row"></div></div>
+    <div class="login-group"><div class="login-label">くみ</div><div id="login-classes" class="login-row"></div></div>
+    <div class="login-group"><label class="login-label" for="login-number">しゅっせき ばんごう</label>
+      <input id="login-number" class="login-input" type="number" inputmode="numeric" min="1" max="40" autocomplete="off"></div>
+    <button id="login-go" class="big-btn g1" type="button"><span class="big-title">はじめる</span></button>
+  </section>
+
   <!-- スタート：学年の入り口 -->
   <section id="screen-start" class="screen">
     <h1 class="logo">ことばブロック<br>くずし</h1>
@@ -28,8 +39,10 @@
     <header class="bar">
       <button id="map-back" class="icon-btn" type="button">もどる</button>
       <div id="map-title" class="bar-title"></div>
+      <div id="map-student" class="bar-note"></div>
       <div id="map-coins" class="bar-note"></div>
     </header>
+    <div id="map-notice" class="notice" hidden></div>
     <div id="map-list" class="map-list"></div>
     <button id="open-all" class="teacher-btn" type="button"></button>
   </section>
@@ -83,6 +96,7 @@
 <script src="js/questions-grade2.js"></script>
 <script src="js/stages.js"></script>
 <script src="js/audio.js"></script>
+<script src="js/api.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/render.js"></script>

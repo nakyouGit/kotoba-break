@@ -1,8 +1,12 @@
 /* セーブデータ（localStorage）。使えない環境でも あそべるように、すべて try/catch で守る */
 (function () {
   var KB = (window.KB = window.KB || {});
-  var KEY = KB.CONFIG.STORAGE_KEY;
+  var BASE_KEY = KB.CONFIG.STORAGE_KEY;
+  var userKey = '';          // ログイン中の児童（学年-組-番号）。空なら ログインなしの保存先
   var memoryFallback = null; // localStorage が使えない時の しのぎ
+
+  // 1台のタブレットを何人かで使っても、児童ごとに保存先を分ける
+  function storageKey() { return userKey ? BASE_KEY + ':' + userKey : BASE_KEY; }
 
   function blank() {
     return { v: 1, stages: {}, progress: null, zukan: [], totalCoins: 0, openAll: false, muted: false };
@@ -10,7 +14,7 @@
 
   function load() {
     var raw = null;
-    try { raw = window.localStorage.getItem(KEY); } catch (e) { return memoryFallback || blank(); }
+    try { raw = window.localStorage.getItem(storageKey()); } catch (e) { return memoryFallback || blank(); }
     if (!raw) return memoryFallback || blank();
     try {
       var data = JSON.parse(raw);
@@ -24,10 +28,23 @@
 
   function write(data) {
     memoryFallback = data;
-    try { window.localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) { /* 保存できなくても あそべる */ }
+    try { window.localStorage.setItem(storageKey(), JSON.stringify(data)); } catch (e) { /* 保存できなくても あそべる */ }
   }
 
   KB.Storage = {
+    setUser: function (key) { userKey = key || ''; memoryFallback = null; },
+    // サーバーの記録を取りこむ（星は多いほう、ずかんはまとめる、ほしは大きいほう）
+    mergeRemote: function (remote) {
+      var data = load();
+      Object.keys(remote.stages || {}).forEach(function (id) {
+        var r = remote.stages[id], l = data.stages[id] || { cleared: false, bestStars: 0, bestScore: 0, plays: 0 };
+        data.stages[id] = { cleared: l.cleared || !!r.cleared, bestStars: Math.max(l.bestStars, r.bestStars || 0),
+          bestScore: Math.max(l.bestScore, r.bestScore || 0), plays: Math.max(l.plays, r.plays || 0) };
+      });
+      (remote.zukan || []).forEach(function (id) { if (data.zukan.indexOf(id) < 0) data.zukan.push(id); });
+      data.totalCoins = Math.max(data.totalCoins, remote.coins || 0);
+      write(data);
+    },
     getStage: function (stageId) {
       return load().stages[stageId] || { cleared: false, bestStars: 0, bestScore: 0, plays: 0 };
     },
